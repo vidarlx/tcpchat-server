@@ -1,0 +1,8 @@
+{
+    "name": "czat-tcp",
+    "description": "czat oparty o serwer tcp",
+    "version": "0.0.1",
+    "dependencies": {
+        "colors": "~0.6"
+    }
+}
