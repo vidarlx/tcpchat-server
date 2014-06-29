@@ -1,4 +1,5 @@
 var net = require('net');
+var Commands = require('./commands.js').Commands;
 
 var stdin =  process.stdin;
 var stdout = process.stdout;
@@ -6,6 +7,7 @@ var stdout = process.stdout;
 var ChatServer = function(port){
     this._port = port;
     this._users = [];
+    this._commands = new Commands();
 };
 
 ChatServer.prototype.run = function() {
@@ -40,15 +42,29 @@ ChatServer.prototype.run = function() {
                     }
 
                 } else {
+                    if(that._isCommand(data)) {
+                        that._processCommand(data);
+                    } else {
                         that.broadcast(nickname + ': ' + data);
-                        insertPrompt(conn);
+                    }
+                    insertPrompt(conn);
                 }
             }
         }
+
+        that._commands.addListener('list_users', function() {
+            var users = Object.keys(that._users);
+            conn.write(users.join(', ') + '\r\n');
+        });
+
+        that._commands.addListener('unknown_command', function() {
+            conn.write('*** Unknown command');
+        });
+
     }).listen(this._port);
 
     function insertPrompt(conn) {
-        conn.write('\r\n > ');
+        conn.write('\r\n> ');
     }
 }
 
@@ -68,6 +84,24 @@ ChatServer.prototype._userExists = function(username) {
     return false;
 };
 
+ChatServer.prototype._isCommand = function(msg) {
+    if(ChatServer.COMMAND_PATTERN.test(msg)){
+        return true;
+    }
+    return false;
+};
+
+ChatServer.prototype._processCommand = function(msg) {
+    var commandParams = ChatServer.COMMAND_PATTERN.exec(msg);
+    var command = commandParams[1];
+    var params = '';
+    if(commandParams[2]) {
+        params = commandParams[2].trim().split(' ');
+    }
+
+    this._commands.runCommand(command, params);
+};
+
 ChatServer.prototype.broadcast = function(msg, system) {
     if(system) {
         msg = "*** " + msg;
@@ -78,6 +112,7 @@ ChatServer.prototype.broadcast = function(msg, system) {
 };
 
 ChatServer.TELNET_CONNECTION_BUFFER = "fffb1ffffb20fffb18fffb27fffd01fffb03fffd03";
+ChatServer.COMMAND_PATTERN = /\/([a-z0-9]+)(\s.*)*/;
 
 var srv = new ChatServer(3000);
 srv.run();
